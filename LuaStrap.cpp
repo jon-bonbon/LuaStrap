@@ -1,6 +1,4 @@
 #include "LuaStrap.h"
-#include "LuaUtils.h"
-#include <iostream>
 #include <algorithm>
 #include <numeric>
 
@@ -699,6 +697,8 @@ void publishStl(lua_State* ls) {
 			&pass<Func, ArrayIterator, ArrayIterator, ArrayIterator, StackFunc<StackObj>, StackFunc<StackObj>>
 		); lua_setfield(ls, -2, "transform_inclusive_scan");
 	}
+
+	#undef Wrapper
 }
 
 }	// end namespace LuaStrap
