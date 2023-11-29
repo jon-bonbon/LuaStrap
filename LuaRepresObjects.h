@@ -87,9 +87,9 @@ namespace LuaStrap {
 
 			// Call, evaluate and clean up
 			lua_call(ls, sizeof...(args), LUA_MULTRET);
-			if (lua_gettop(ls) != origTop + sizeof...(RetTypes)) {
-				luaL_error(ls, stackFuncWrongReturnCount(sizeof...(RetTypes), lua_gettop(ls) - origTop).c_str());
-			}
+			auto expectedRetCount = sizeof...(RetTypes);
+			auto gottenRetCount = lua_gettop(ls) - origTop;
+			assert(gottenRetCount == expectedRetCount && "Function referred to by 'StackFunc' returned the wrong number of arguments");
 
 			if constexpr (sizeof...(RetTypes) > 0) {
 				auto idx = origTop;
@@ -99,12 +99,8 @@ namespace LuaStrap {
 					++idx;
 					auto origTop = lua_gettop(ls);
 					auto val = LuaStrap::read<Ret>(ls, idx);
-					if (lua_gettop(ls) != origTop) {
-						luaL_error(ls, "Types which push on read must not be returned from a function referred to by 'StackFunc'.");
-					}
-					if (!val) {
-						luaL_error(ls, stackFuncWrongReturnTypes<RetTypes...>().c_str());
-					}
+					assert(lua_gettop(ls) == origTop && "Types which push on read must not be returned from a function referred to by 'StackFunc'.");
+					assert(val && "Function referred to by 'StackFunc' didn't return what it was supposed to.");
 					return std::move(*val);
 				};
 				auto res = PackIfNeccessary<RetTypes...>{ readStep.template operator()<RetTypes>()... };
