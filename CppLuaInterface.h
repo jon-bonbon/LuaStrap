@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 #include <cassert>
+#include <functional>
 
 namespace LuaStrap {
 	template <typename T>
@@ -176,6 +177,14 @@ namespace LuaStrap {
 			++dest;
 		});
 	}
+
+	// Called in case a user-caused error happens in a spot which can't longjmp (these spots are rare).
+	// Terminates by default, can be customized by the user.
+	extern std::function<void(std::string_view)> edgeCaseErrorHandler;
+
+	// Some types (see LuaRepresObjects.h) generate garbage as a side effect of their operation.
+	// This function is called at the end of every lua-bound func. It clears the garbage.
+	void clearLuaRepresObjGarbage();
 
 	// For a bound function with parameters Args..., returns the min and max amount of arguments (inclusively)
 	// it can be called with - based on how many args from the right have default values.

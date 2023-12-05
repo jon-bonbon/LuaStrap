@@ -76,7 +76,7 @@ namespace LuaStrap {
 		// Invoke the invocable
 		if constexpr (std::is_same_v<Ret, void> || std::is_same_v<Ret, decltype(bakedReturnValueTag)>) {
 			std::apply(
-				[&](PotentialOwner<std::decay_t<Args>>&... arg) { std::invoke(f, *arg...); },
+				[&](PotentialOwner<std::decay_t<Args>>&... arg) { return std::invoke(f, *arg...); },
 				translatedArgs
 			);
 		}
@@ -110,6 +110,8 @@ namespace LuaStrap {
 			auto dummy = (emplaceArg.template operator()<indices>() && ...);
 		};
 		emplaceArgs(std::make_integer_sequence<int, sizeof...(Args)>{});
+
+		clearLuaRepresObjGarbage();
 
 		return res;
 	}

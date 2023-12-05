@@ -73,7 +73,9 @@ namespace LuaStrap {
 		using StackObj::StackObj;
 
 		auto operator()(const StackValue auto&... args) const {		// [-0, +n, e]
-			assert(lua_isfunction(ls, idx));
+			if (!lua_isfunction(ls, idx)) {
+				edgeCaseErrorHandler("'StackFunc' refers to a non-function.");
+			}
 			auto origTop = lua_gettop(ls);
 
 			// Push the function
@@ -89,7 +91,9 @@ namespace LuaStrap {
 			lua_call(ls, sizeof...(args), LUA_MULTRET);
 			auto expectedRetCount = sizeof...(RetTypes);
 			auto gottenRetCount = lua_gettop(ls) - origTop;
-			assert(gottenRetCount == expectedRetCount && "Function referred to by 'StackFunc' returned the wrong number of arguments");
+			if (gottenRetCount != expectedRetCount) {
+				edgeCaseErrorHandler("Function referred to by 'StackFunc' returned the wrong number of arguments.");
+			}
 
 			if constexpr (sizeof...(RetTypes) > 0) {
 				auto idx = origTop;
@@ -99,8 +103,12 @@ namespace LuaStrap {
 					++idx;
 					auto origTop = lua_gettop(ls);
 					auto val = LuaStrap::read<Ret>(ls, idx);
-					assert(lua_gettop(ls) == origTop && "Types which push on read must not be returned from a function referred to by 'StackFunc'.");
-					assert(val && "Function referred to by 'StackFunc' didn't return what it was supposed to.");
+					if (lua_gettop(ls) != origTop) {
+						edgeCaseErrorHandler("Types which push on read must not be returned from a function referred to by 'StackFunc'.");
+					}
+					if (!val) {
+						edgeCaseErrorHandler("Function referred to by 'StackFunc' didn't return what it was supposed to.");
+					}
 					return std::move(*val);
 				};
 				auto res = PackIfNeccessary<RetTypes...>{ readStep.template operator()<RetTypes>()... };
@@ -336,7 +344,7 @@ namespace LuaStrap {
 	struct Traits<ArrayIterator> {
 		// raw { [1] = (table)theArray, [2] = (integer)key }
 		static auto read(lua_State* ls, int idx) -> std::optional<ArrayIterator> {		// [-0, +1]
-			if (!lua_istable(ls, -1)) {
+			if (!lua_istable(ls, idx)) {
 				return std::nullopt;
 			}
 

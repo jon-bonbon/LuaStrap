@@ -3,6 +3,7 @@
 #include "../BasicTraits.h"
 #include <cmath>
 #include <array>
+#include <iostream>
 
 namespace VecMat {
 
@@ -13,16 +14,16 @@ namespace VecMat {
 	struct VectorTraits {}; // specialize this for custom vector classes
 	template <typename T>
 	concept Vector =
-		requires(T & t, const T & ct, const typename VectorTraits<T>::ElemType & elm) {
+		requires(T & t, const T & ct, const typename VectorTraits<T>::Elem & elm) {
 			{ VectorTraits<T>::dimension } -> std::convertible_to<int>;
-			{ VectorTraits<T>::getElem(ct, int{}) } -> std::convertible_to<typename VectorTraits<T>::ElemType>;
+			{ VectorTraits<T>::getElem(ct, int{}) } -> std::convertible_to<typename VectorTraits<T>::Elem>;
 			{ VectorTraits<T>::setElem(t, int{}, elm) };
 	}&&
 		VectorTraits<std::decay_t<T>>::dimension > 0;
 
 	template <typename T, int howManyElems> struct Vec { std::array<T, howManyElems> elems; };
 	template <typename T, int howManyElems> struct VectorTraits<Vec<T, howManyElems>> {
-		using ElemType = T;
+		using Elem = T;
 		constexpr static int dimension = howManyElems;
 		constexpr static auto getElem(const Vec<T, howManyElems>& vec, int idx) -> const T& { return vec.elems[idx]; }
 		constexpr static void setElem(Vec<T, howManyElems>& vec, int idx, const T& val) { vec.elems[idx] = val; }
@@ -58,22 +59,25 @@ namespace VecMat {
 	template <typename T>
 	concept Matrix =
 		requires(T & t, const T & ct, const typename MatrixTraits<T>::Elem & elm) {
-			{ MatrixTraits<T>::dimension.x } -> std::convertible_to<int>;
-			{ MatrixTraits<T>::dimension.y } -> std::convertible_to<int>;
+			{ MatrixTraits<T>::dimensionX } -> std::convertible_to<int>;
+			{ MatrixTraits<T>::dimensionY } -> std::convertible_to<int>;
 			{ MatrixTraits<T>::getElem(ct, int{}, int{}) } -> std::convertible_to<typename MatrixTraits<T>::Elem>;
 			{ MatrixTraits<T>::setElem(t, int{}, int{}, elm) };
 			// +x goes right, +y goes down!
 	}&&
-		MatrixTraits<T>::dimension.x > 0 &&
-		MatrixTraits<T>::dimension.y > 0;
+		MatrixTraits<T>::dimensionX > 0 &&
+		MatrixTraits<T>::dimensionY > 0;
 
 	template <typename T, int w, int h> struct Mat { std::array<T, w* h> elems; };
 	template <typename T, int w, int h> struct MatrixTraits<Mat<T, w, h>> {
 		using Elem = T;
-		constexpr static Vec<int, 2> dimension = { w, h };
+		constexpr static int dimensionX = w;
+		constexpr static int dimensionY = h;
 
 		constexpr static auto getElem(const Mat<T, w, h>& mat, int i) -> const T& { return mat.elems[i]; }
+		constexpr static auto getElem(const Mat<T, w, h>& mat, int x, int y) -> const T& { return mat.elems[x + y*w]; }
 		constexpr static void setElem(Mat<T, w, h>& mat, int i, const T& val) { mat.elems[i] = val; }
+		constexpr static void setElem(Mat<T, w, h>& mat, int x, int y, const T& val) { mat.elems[x + y*w] = val; }
 	};
 	template <Matrix M>
 	struct LuaStrap::Traits<M> {
@@ -81,7 +85,7 @@ namespace VecMat {
 		// { [1] = elm1, ... }
 		using MatTraits = VecMat::MatrixTraits<M>;
 		using ElemT = MatTraits::Elem;
-		constexpr static auto matSize = MatTraits::dimension.x * MatTraits::dimension.y;
+		constexpr static auto matSize = MatTraits::dimensionX * MatTraits::dimensionY;
 
 		static auto read(lua_State* ls, int idx) -> std::optional<M> {
 			if (lua_type(ls, idx) != LUA_TTABLE) {
@@ -124,7 +128,7 @@ namespace VecMat {
 	}
 
 	template <Vector VecA, Vector VecB>
-	constexpr auto scaleAlong(VecA& a, const VecB& axis, typename VectorTraits<VecA>::ElemType sc)
+	constexpr auto scaleAlong(VecA& a, const VecB& axis, typename VectorTraits<VecA>::Elem sc)
 		requires (VectorTraits<VecA>::dimension == VectorTraits<VecB>::dimension)
 	{
 		auto d = dot(a, axis);
@@ -175,28 +179,60 @@ namespace VecMat {
 	}
 
 	template <Matrix MatA, Matrix MatB>
-		requires (MatrixTraits<MatA>::dimension.x == MatrixTraits<MatB>::dimension.y)
+		requires (MatrixTraits<MatA>::dimensionX == MatrixTraits<MatB>::dimensionY)
 	constexpr auto operator*(const MatA& a, const MatB& b) {
-		using MultiplyResult = decltype(getElem(a, 0, 0)* getElem(b, 0, 0));
+		using ATr = MatrixTraits<MatA>;
+		using BTr = MatrixTraits<MatB>;
+		using MultiplyResult = decltype(ATr::getElem(a, 0, 0) * BTr::getElem(b, 0, 0));
 		using AdditionResult = decltype(std::declval<MultiplyResult>() + std::declval<MultiplyResult>());
-		constexpr auto bWidth = MatrixTraits<MatB>::dimension.x;
-		constexpr auto aHeight = MatrixTraits<MatA>::dimension.y;
-		constexpr auto depth = MatrixTraits<MatA>::dimension.x;
+		constexpr auto bWidth = BTr::dimensionX;
+		constexpr auto aHeight = ATr::dimensionY;
+		constexpr auto depth = ATr::dimensionX;
+
 		auto result = Mat<AdditionResult, bWidth, aHeight>{};
+		using RTr = MatrixTraits<decltype(result)>;
+
 		for (int index = 0; index < bWidth * aHeight; ++index) {
 			int cellX = index % bWidth;
 			int cellY = index / bWidth;
 			auto sum = AdditionResult(0);
 			for (int i = 0; i < depth; ++i) {
-				sum += getElem(a, i, cellY) * getElem(b, cellX, i);
+				sum += ATr::getElem(a, i, cellY) * BTr::getElem(b, cellX, i);
 			}
-			setElem(result, cellX, cellY, sum);
+			RTr::setElem(result, cellX, cellY, sum);
 		}
 		return result;
 	}
 
+	template <Matrix M>
+		requires (MatrixTraits<M>::dimensionX == 1)
+	auto toVector(const M& mat) {
+		using MTr = MatrixTraits<M>;
+		using Res = Vec<typename MTr::Elem, MTr::dimensionY>;
+		using RTr = VectorTraits<Res>;
+
+		Res res;
+		for (auto i = 0; i < MTr::dimensionY; ++i) {
+			RTr::setElem(res, i, MTr::getElem(mat, 0, i));
+		}
+		return res;
+	}
+
+	template <Vector V>
+	auto toMatrixColumn(const V& vec) {
+		using VTr = VectorTraits<V>;
+		using Res = Mat<typename VTr::Elem, 1, VTr::dimension>;
+		using RTr = MatrixTraits<Res>;
+
+		Res res;
+		for (auto i = 0; i < VTr::dimension; ++i) {
+			RTr::setElem(res, 0, i, VTr::getElem(vec, i));
+		}
+		return res;
+	}
+
 	template <Matrix M, Vector V>
-		requires (MatrixTraits<M>::dimension.x == VectorTraits<V>::dimension)
+		requires (MatrixTraits<M>::dimensionX == VectorTraits<V>::dimension)
 	constexpr auto operator*(const M& a, const V& b) {
 		return toVector(a * toMatrixColumn(b));
 	}
@@ -204,7 +240,7 @@ namespace VecMat {
 
 // Examples of how to make custom builders, in case SimpleBuilders aren't enough
 
-struct VecBuilder2 {
+struct VecBuilder {
 	using PossibleTypes = std::tuple<VecMat::Vec<float, 2>, VecMat::Vec<float, 3>, VecMat::Vec<float, 4>>;
 
 	template <typename Continuation, typename Pool>
@@ -218,7 +254,7 @@ struct VecBuilder2 {
 
 		constexpr int capacity = 4;
 		float elms[capacity];
-		auto elemCount = LuaStrap::readArrayUpTo<float>(ls, idx, capacity, elms);
+		auto elemCount = LuaStrap::readArrayUpTo<float>(ls, idx, capacity, &elms[0]);
 
 		switch (elemCount) {
 			break; case 2: continuation(pool.build<VecMat::Vec<float, 2>>(elms[0], elms[1]));
@@ -326,7 +362,7 @@ void doVectorMatrixTest(lua_State* ls) {
 	lst::pushBulkFunc<matB, matB>(ls, lstrapFuncWrapper(VecMat::operator*));
 	lua_setglobal(ls, "matMatMul");
 
-	luaL_dostring(ls, R"delim(
+	auto testFailed = luaL_dostring(ls, R"delim(
 
 	assert(dot({0, 1, 0, 1}, {1.0, 0.75, 0.5, 0.25}) == 1.0)
 	--dot({0, 1, 0, 1}, {1.0, 0.75, 0.5})		-- error! can't dot a 4-vector with a 3-vector
@@ -352,6 +388,7 @@ void doVectorMatrixTest(lua_State* ls) {
 
 	-- m is interpreted as a 2x3 matrix, to match the 2-vector
 	local v = { 2, 3 }
+
 	local newV = matVecMul(m, v)
 	assert(newV[1] == 2 and newV[2] == 3 and newV[3] == 5)
 
@@ -387,4 +424,9 @@ void doVectorMatrixTest(lua_State* ls) {
 	local confusingMat = matMatMul(scaleMat, mat)
 
 	)delim");
+
+	if (testFailed) {
+		std::cout << "VectorMatrixTest.cpp: " << lua_tostring(ls, -1) << "\n";
+		lua_pop(ls, 1);
+	}
 }

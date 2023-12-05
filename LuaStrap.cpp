@@ -4,7 +4,15 @@
 
 namespace LuaStrap {
 
+std::function<void(std::string_view)> edgeCaseErrorHandler = [](std::string_view errMsg) {
+	assert(false);
+	std::terminate();
+};
 std::deque<StackArrayElem> ArrayIterator::nonOwners;
+
+void clearLuaRepresObjGarbage() {
+	ArrayIterator::clearGarbage();
+}
 
 template <typename Dest, typename... Args>
 auto pass(Args... args) {

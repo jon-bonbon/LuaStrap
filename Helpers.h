@@ -187,7 +187,7 @@ namespace LuaStrap {
 		else {
 			using CurrentT = std::tuple_element_t<currentIdx, std::tuple<Ts...>>;
 
-			if constexpr (std::derived_from<Pred<CurrentT>, std::true_type>) {
+			if constexpr (!requires{ CurrentT::ambiguous; } /*std::derived_from<Pred<CurrentT>, std::true_type>*/) {
 				return typePartitionStep<Pred, Ts...>(
 					std::integer_sequence<int, TrueIndices..., currentIdx>{},
 					std::integer_sequence<int, FalseIndices...>{},

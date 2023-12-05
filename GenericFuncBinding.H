@@ -206,6 +206,10 @@ namespace LuaStrap {
 		using ReorderedBuildersTuple = ReorderedTuple<BuildersTuple, BuilderOrder>;
 		using Pool = UnwrapTuple<PoolForBuilders, ReorderedBuildersTuple>;
 
+		static_assert(std::convertible_to<std::true_type, decltype(bulkExecStep(
+			std::declval<std::tuple<>*>(), ls, 1, std::declval<Pool&>(), reorderedExec, ReorderedBuildersTuple{}, std::declval<int*>()
+		))>, "The supplied function cannot be called with the supplied builders (no combination of their arguments is valid).");
+
 		lua_pushcfunction(ls, [](lua_State* ls) {
 			lua_checkstack(ls, sizeof...(Builders));
 			lua_settop(ls, sizeof...(Builders));

@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <array>
+#include <iostream>
 
 // Item 1 - Functions of basic types (built in types + standard containers)
 auto average(double a, double b) {
@@ -140,7 +141,7 @@ void doLuaTests(lua_State* ls) {
 	// ^ providing a factory function IS neccessary, since this type has no lua representation
 
 
-	luaL_dostring(ls, R"delim(
+	auto testFailed = luaL_dostring(ls, R"delim(
 
 	-- Item 1
 	assert( average(3, 5) == 4 )
@@ -151,7 +152,7 @@ void doLuaTests(lua_State* ls) {
 	}
 	eraseKey(tbl, "abcd")
 	eraseKey(tbl, 50)
-	assert( tbl["abcd"] == nil and tbl["efg"] == {} and tbl[50] == nil )
+	assert( tbl["abcd"] == nil and tbl[50] == nil )
 
 	-- Item 2
 	assert( plus(10, 5) == 15 )
@@ -203,6 +204,9 @@ void doLuaTests(lua_State* ls) {
 
 	)delim");
 
-
+	if (testFailed) {
+		std::cout << "Tests.cpp: " << lua_tostring(ls, -1) << "\n";
+		lua_pop(ls, 1);
+	}
 
 }
