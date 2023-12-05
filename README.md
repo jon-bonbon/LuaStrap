@@ -1,5 +1,5 @@
 # LuaStrap
-A library for binding C++ functions and types to Lua, with a focus on generic programming. To that end, it provides a mechanism for binding families of functions operating on a generic concept, and makes available the entirety of the STL. In addition, most of the features expected of a lua binding library are provided. LuaStrap does thorough runtime error checking and uses C++20 concepts and constraints for high-quality compiler errors.
+A library for binding C++ functions and types to Lua, with a focus on generic programming. To that end, it provides a mechanism for binding families of functions operating on a generic concept, and makes available the entirety of the STL. In addition, most of the features expected of a lua binding library are provided. LuaStrap does thorough runtime error checking and uses C++20 concepts and constraints for high-quality compiler errors. Tested on MSVC.
 
 # Initialization
 C++20 and Lua 5.3 are required. LuaStrap.cpp must be compiled as part of the project.
@@ -57,7 +57,7 @@ local tbl = {
 }
 eraseKey(tbl, "abcd")
 eraseKey(tbl, 50)
-assert( tbl["abcd"] == nil and tbl["efg"] == {} and tbl[50] == nil )
+assert( tbl["abcd"] == nil and tbl[50] == nil )
 ```
 
 # Overloaded/generic functions
