@@ -100,7 +100,7 @@ struct Person {
 void mature(Person& p) { if (p.age < 18) { p.age = 18; } }
 
 template <>
-struct LuaBinding::Traits<Person> : LuaBinding::AggregateTraits<Person> {
+struct LuaStrap::Traits<Person> : LuaStrap::AggregateTraits<Person> {
 	inline static auto members = std::tuple{
 		std::pair{ "name", &Person::name },
 		std::pair{ "address", &Person::address },
@@ -181,7 +181,7 @@ private:
 	// ... a million other things ...
 };
 template <>
-struct LuaBinding::Traits<Scene> {
+struct LuaStrap::Traits<Scene> {
 	inline static auto members = std::tuple{
 		std::pair{ "render", &Scene::render },
 		std::pair{ "getObjCount", &Scene::getObjCount },
